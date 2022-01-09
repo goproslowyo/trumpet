@@ -319,10 +319,6 @@ func main() {
 		fmt.Printf(notInstalledErrMsg, "ffmpeg", cfg.FfmpegPath, configFile)
 		return
 	}
-	if !util.CheckInstalled(cfg.StreamlinkPath, "--version") {
-		fmt.Printf(notInstalledErrMsg, "streamlink", cfg.StreamlinkPath, configFile)
-		return
-	}
 
 	// Initialize client map.
 	clients = make(map[string]*Client)

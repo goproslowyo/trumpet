@@ -1,0 +1,9 @@
+{
+	"ffmpeg_path": "ffmpeg",
+	"google_service_account_credentials": "google-translate-api-credentials.json",
+	"ignore_list": [],
+	"prefix": "!",
+	"token": "insert your discord bot token here",
+	"user_audio_path": "audio/",
+	"youtube-dl_path": "youtube-dl"
+}

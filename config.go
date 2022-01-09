@@ -11,7 +11,6 @@ type Config struct {
 	GoogleServiceAccountCredentials string   `json:"google_service_account_credentials"`
 	IgnoreList                      []string `json:"ignore_list"`
 	Prefix                          string   `json:"prefix"`
-	StreamlinkPath                  string   `json:"streamlink_path"`
 	Token                           string   `json:"token"`
 	UserAudioPath                   string   `json:"user_audio_path"`
 	YtdlPath                        string   `json:"youtube-dl_path"`
@@ -40,7 +39,6 @@ func WriteDefaultConfig() error {
 		GoogleServiceAccountCredentials: "google-translate-api-credentials.json",
 		IgnoreList:                      []string{},
 		Prefix:                          "!",
-		StreamlinkPath:                  "streamlink",
 		Token:                           tokenDefaultString,
 		UserAudioPath:                   "audio/",
 		YtdlPath:                        "youtube-dl",
