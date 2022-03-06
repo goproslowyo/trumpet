@@ -22,6 +22,9 @@ Example configuration:
 
 ```json
 {
+	"custom_names": {
+		"ExampleUser": "Call Me Something Else"
+	},
 	"ffmpeg_path": "ffmpeg",
 	"google_service_account_credentials": "google-translate-api-credentials.json",
 	"ignore_list": [],
@@ -34,11 +37,19 @@ Example configuration:
 
 - Copy `config.json.example config.json` or run the binary once to generate `config.json`: `./trumpet`.
 
-
-
 - In `config.json`, find the line that says `"token"`. In that line, change the text that says `"insert your discord bot token here"` to whatever your bot token is (just look it up if you don't know how to get one). Remember to keep the `""` surrounding the token.
 
 - Run the program: `./trumpet`.
+
+### Configuration Options
+
+Useful Note: The program _should_ support config hot-reloading and my minimal testing shows that you can change `config.json` and get a new config loaded without restarting the bot.
+
+There are two main "options" you'll probably adjust often when using trumpet, the ability to "ignore" a user and the ability to have a "custom" vanity name.
+
+The `custom_names` variable contains a key:value mapping of username to preffered "custom" announcement name.
+
+The `ignore_list` variable is simply a list of usernames to ignore so the bot will not announce their join/part events.
 
 ## Notes
 

@@ -1,9 +1,12 @@
 {
-	"ffmpeg_path": "ffmpeg",
-	"google_service_account_credentials": "google-translate-api-credentials.json",
-	"ignore_list": [],
-	"prefix": "!",
-	"token": "insert your discord bot token here",
-	"user_audio_path": "audio/",
-	"youtube-dl_path": "youtube-dl"
+  "custom_names": {
+    "ExampleUser": "Call Me Something Else"
+  },
+  "ffmpeg_path": "ffmpeg",
+  "google_service_account_credentials": "google-translate-api-credentials.json",
+  "ignore_list": [],
+  "prefix": "!",
+  "token": "insert your discord bot token here",
+  "user_audio_path": "audio/",
+  "youtube-dl_path": "youtube-dl"
 }

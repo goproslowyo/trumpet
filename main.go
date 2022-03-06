@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -242,10 +243,10 @@ func (c *Client) QueueClear() {
 }
 
 // GetAudioFile checks the audio cache or creates the file.
-func GetAudioFile(messages []string, userid string) error {
-
-	joinPath := fmt.Sprintf("%s_join.ogg", filepath.Join(cfg.UserAudioPath, userid))
-	partPath := fmt.Sprintf("%s_leave.ogg", filepath.Join(cfg.UserAudioPath, userid))
+func GetAudioFile(messages []string, userid string, username string) error {
+	filename := fmt.Sprintf("%s_%s", userid, username)
+	joinPath := fmt.Sprintf("%s_join.ogg", filepath.Join(cfg.UserAudioPath, filename))
+	partPath := fmt.Sprintf("%s_leave.ogg", filepath.Join(cfg.UserAudioPath, filename))
 
 	_, err := os.OpenFile(joinPath, os.O_RDONLY, 0640)
 	if errors.Is(err, os.ErrNotExist) {
@@ -471,6 +472,12 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		return
 	}
 
+	// Check if the configHash has changed and if so, update the config.
+	err = ReadConfig(&cfg)
+	if err != nil {
+		logger.Error("Error: Failed to re-read config file: " + fmt.Sprintf("%s", err))
+	}
+
 	// Check if it's a user on the ignore list.
 	for _, ignore := range cfg.IgnoreList {
 		if member.User.Username == ignore {
@@ -478,15 +485,37 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		}
 	}
 
-	// Initial voice event. Also cache join/part audio for user if it doesn't exist.
 	logger.Debug("Voice event for user: " + member.User.Username + "#" + member.User.Discriminator + ".")
-	join := fmt.Sprintf("%s joined.", member.User.Username)
-	part := fmt.Sprintf("%s left.", member.User.Username)
-	msgs := []string{join, part}
 
-	err = GetAudioFile(msgs, member.User.ID)
-	if err != nil {
-		logger.Error("Error: Failed to get audio file for user " + member.User.Username + "#" + member.User.Discriminator + ".")
+	// Check if user has a "custom name" set
+	customBool := false
+	var customName string
+	for userName, customUserName := range cfg.CustomNames {
+		if strings.EqualFold(member.User.Username, userName) {
+			customBool = true
+			customName = customUserName
+		}
+	}
+
+	// Use custom name, or...
+	if customBool {
+		logger.Info("Real user and custom name: " + fmt.Sprintf("%s and %s", member.User.Username, customName))
+		join := fmt.Sprintf("%s joined.", customName)
+		part := fmt.Sprintf("%s left.", customName)
+		msgs := []string{join, part}
+		err = GetAudioFile(msgs, member.User.ID, customName)
+		if err != nil {
+			logger.Error("Error: Failed to get custom audio file for user (" + customName + ") " + member.User.Username + "#" + member.User.Discriminator + ".")
+		}
+		// Use standard name.
+	} else {
+		join := fmt.Sprintf("%s joined.", member.User.Username)
+		part := fmt.Sprintf("%s left.", member.User.Username)
+		msgs := []string{join, part}
+		err = GetAudioFile(msgs, member.User.ID, member.User.Username)
+		if err != nil {
+			logger.Error("Error: Failed to get audio file for user " + member.User.Username + "#" + member.User.Discriminator + ".")
+		}
 	}
 
 	s.RLock()
@@ -517,7 +546,13 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		time.Sleep(1250 * time.Millisecond)
 		// TODO: Make this a configurable option.
 		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], "trumpet.opus", make(<-chan bool))
-		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, member.User.ID)+"_join.ogg", make(<-chan bool))
+		if customBool {
+			filename := fmt.Sprintf("%s_%s", member.User.ID, customName)
+			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
+		} else {
+			filename := fmt.Sprintf("%s_%s", member.User.ID, member.User.Username)
+			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
+		}
 		logger.Debug("Event doesn't have a BeforeUpdate",
 			zap.String("Member", fmt.Sprintf("%s#%s", member.User.Username, member.User.Discriminator)),
 			zap.String("Channel", event.ChannelID),
@@ -547,7 +582,13 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 	// Ignore messages from voice channels the bot is not in.
 	if event.ChannelID != botChannel.ChannelID {
 		logger.Info("User has left voice channel: " + member.User.Username + "#" + member.User.Discriminator + ".")
-		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, member.User.ID)+"_leave.ogg", make(<-chan bool))
+		if customBool {
+			filename := fmt.Sprintf("%s_%s", member.User.ID, customName)
+			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_leave.ogg", make(<-chan bool))
+		} else {
+			filename := fmt.Sprintf("%s_%s", member.User.ID, member.User.Username)
+			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_leave.ogg", make(<-chan bool))
+		}
 	}
 
 	logger.Debug("DEBUG: Events here are screenshare-related or otherwise unknown.")
