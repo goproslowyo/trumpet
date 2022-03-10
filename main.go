@@ -156,13 +156,15 @@ func (c *Client) GetVoiceChannelID() string {
 // are NOT preserved, as it is a copy.
 func (c *Client) GetPlaybackInfo() (p Playback, ok bool) {
 	c.RLock()
-	ret := c.Playback
-	c.RUnlock()
-	if ret == nil {
-		return Playback{}, false
-	} else {
+	// Unlock at the very end, otherwise the client can be mutated mid copy and
+	// result in corrupted data.
+	defer c.RUnlock()
+
+	if ret := c.Playback; ret != nil {
 		return *ret, true
 	}
+
+	return Playback{}, false
 }
 
 func (c *Client) QueueLen() int {
@@ -181,8 +183,8 @@ func (c *Client) QueueAt(i int) (t Track, ok bool) {
 		return Track{}, false
 	}
 	c.RLock()
+	defer c.RUnlock()
 	ret := c.Queue[i]
-	c.RUnlock()
 	return *ret, true
 }
 
@@ -284,6 +286,7 @@ func GetAudioFile(messages []string, userid string, username string) error {
 ////////////////////////////////
 var clients map[string]*Client // Guild ID to client
 var mClients sync.Mutex
+var mPlayAudio sync.Mutex
 
 var cfg Config
 var logger *zap.Logger
@@ -527,11 +530,17 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 			logger.Sugar().Errorf("Error joining voice channel: %s.", err)
 			return
 		}
-		defer vc.Disconnect()
 		s.Lock()
 		s.VoiceConnections[event.GuildID] = vc
 		s.Unlock()
 	}
+
+	botChannel, err := s.State.VoiceState(event.GuildID, s.State.User.ID)
+	if err != nil {
+		logger.Sugar().Errorf("Error determining bot voice channel: %s.", err)
+		return
+	}
+
 	// vc.Lock()
 	// vc.LogLevel = discordgo.LogDebug
 	// vc.Unlock()
@@ -541,11 +550,16 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		logger.Error("Error: Failed to get voice state of user " + event.UserID + ".")
 		return
 	}
-	if event.BeforeUpdate == nil {
+	if (event.BeforeUpdate == nil || event.BeforeUpdate.ChannelID != botChannel.ChannelID) && event.ChannelID == botChannel.ChannelID {
 		logger.Info("User has joined voice channel: " + member.User.Username + "#" + member.User.Discriminator + ".")
 		time.Sleep(1250 * time.Millisecond)
+
+		// Stop the bot from trying to read multiple joins at the same time (so that it doesn't destroy our ears)
+		mPlayAudio.Lock()
+
 		// TODO: Make this a configurable option.
 		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], "trumpet.opus", make(<-chan bool))
+
 		if customBool {
 			filename := fmt.Sprintf("%s_%s", member.User.ID, customName)
 			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
@@ -553,6 +567,9 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 			filename := fmt.Sprintf("%s_%s", member.User.ID, member.User.Username)
 			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
 		}
+
+		mPlayAudio.Unlock()
+
 		logger.Debug("Event doesn't have a BeforeUpdate",
 			zap.String("Member", fmt.Sprintf("%s#%s", member.User.Username, member.User.Discriminator)),
 			zap.String("Channel", event.ChannelID),
@@ -561,7 +578,11 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		)
 		return
 	}
+
 	// Ignore Server/Self Mute/Deafen events.
+	if event.BeforeUpdate == nil {
+		return
+	}
 	if event.BeforeUpdate.Deaf != event.VoiceState.Deaf {
 		return
 	} else if event.BeforeUpdate.SelfDeaf != event.VoiceState.SelfDeaf {
@@ -572,16 +593,12 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		return
 	}
 
-	// Get current bot channel id
-	botChannel, err := s.State.VoiceState(event.GuildID, s.State.User.ID)
-	if err != nil {
-		logger.Error("Error: The bot is not in a voice channel! Joining... " + event.ChannelID)
-		s.ChannelVoiceJoin(event.GuildID, event.ChannelID, false, true)
-		return
-	}
 	// Ignore messages from voice channels the bot is not in.
-	if event.ChannelID != botChannel.ChannelID {
+	if event.BeforeUpdate.ChannelID == botChannel.ChannelID && event.ChannelID != botChannel.ChannelID {
 		logger.Info("User has left voice channel: " + member.User.Username + "#" + member.User.Discriminator + ".")
+
+		mPlayAudio.Lock()
+
 		if customBool {
 			filename := fmt.Sprintf("%s_%s", member.User.ID, customName)
 			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_leave.ogg", make(<-chan bool))
@@ -589,6 +606,9 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 			filename := fmt.Sprintf("%s_%s", member.User.ID, member.User.Username)
 			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_leave.ogg", make(<-chan bool))
 		}
+
+		mPlayAudio.Unlock()
+		return
 	}
 
 	logger.Debug("DEBUG: Events here are screenshare-related or otherwise unknown.")

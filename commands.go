@@ -188,7 +188,7 @@ func commandPlay(s *discordgo.Session, g *discordgo.Guild, c *Client, args []str
 // playlist, the entire queue is replaced with that playlist.
 func commandAdd(c *Client, args []string, inPlace bool) {
 	if len(args) < 1 {
-		c.Messagef("Plase specify a URL or a youtube search query.")
+		c.Messagef("Please specify a URL or a youtube search query.")
 		return
 	}
 
