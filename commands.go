@@ -485,3 +485,24 @@ func commandShuffle(c *Client) {
 	c.Unlock()
 	c.Messagef("Successfully shuffled %d items.", queueLen)
 }
+
+func commandJoin(s *discordgo.Session, g *discordgo.Guild, c *Client, m *discordgo.MessageCreate) {
+	// Get the voice channel the user is in (if any), otherwise let's bail
+	if c.VoiceChannelID == "" {
+		logger.Info("No VoiceChannelID associated with message")
+		return
+	}
+
+	c.RLock()
+	channelId := c.VoiceChannelID
+	c.RUnlock()
+
+	guildId := g.ID
+	logger.Info(fmt.Sprintf("Attempting to join voice channel %s", channelId))
+
+	_, err := s.ChannelVoiceJoin(guildId, channelId, false, true)
+	if err != nil {
+		logger.Sugar().Errorf("Error joining voice channel: %s.", err)
+		return
+	}
+}
