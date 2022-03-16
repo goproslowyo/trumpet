@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -246,36 +247,62 @@ func (c *Client) QueueClear() {
 
 // GetAudioFile checks the audio cache or creates the file.
 func GetAudioFile(messages []string, userid string, username string) error {
+	for {
+		if strings.Contains(username, "../") {
+			username = strings.ReplaceAll(username, "../", "")
+			continue
+		}
+		if strings.Contains(username, "./") {
+			username = strings.ReplaceAll(username, "./", "")
+			continue
+		}
+
+		break
+	}
+
 	filename := fmt.Sprintf("%s_%s", userid, username)
 	joinPath := fmt.Sprintf("%s_join.ogg", filepath.Join(cfg.UserAudioPath, filename))
 	partPath := fmt.Sprintf("%s_leave.ogg", filepath.Join(cfg.UserAudioPath, filename))
 
-	_, err := os.OpenFile(joinPath, os.O_RDONLY, 0640)
-	if errors.Is(err, os.ErrNotExist) {
-		logger.Warn("Join file doesn't exist, creating...")
-		joinGreet := SynthesizeSpeech(cfg.GoogleServiceAccountCredentials, messages[0])
-		err = ioutil.WriteFile(joinPath, joinGreet, 0640)
-		if err != nil {
-			logger.Error("Failed to write file",
-				zap.Error(err),
-			)
-		}
-	} else {
+	jf, err := os.OpenFile(joinPath, os.O_RDONLY, 0640)
+	defer func() {
+		_ = jf.Close()
+	}()
+
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
-	_, err = os.OpenFile(partPath, os.O_RDONLY, 0640)
-	if errors.Is(err, os.ErrNotExist) {
-		logger.Warn("Leave file doesn't exist, creating...")
-		partGreet := SynthesizeSpeech(cfg.GoogleServiceAccountCredentials, messages[1])
-		err = ioutil.WriteFile(partPath, partGreet, 0640)
-		if err != nil {
-			logger.Error("Failed to write file:",
-				zap.Error(err),
-			)
-		}
-	} else {
+	logger.Warn("Join file doesn't exist, creating...")
+	joinGreet := SynthesizeSpeech(cfg.GoogleServiceAccountCredentials, messages[0])
+	err = ioutil.WriteFile(joinPath, joinGreet, 0640)
+	if err != nil {
+		logger.Error("Failed to write greeting file",
+			zap.Error(err),
+		)
+	}
+
+	pf, err := os.OpenFile(partPath, os.O_RDONLY, 0640)
+	defer func() {
+		_ = pf.Close()
+	}()
+
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
 		return err
+	}
+	logger.Warn("Leave file doesn't exist, creating...")
+	partGreet := SynthesizeSpeech(cfg.GoogleServiceAccountCredentials, messages[1])
+	err = ioutil.WriteFile(partPath, partGreet, 0640)
+	if err != nil {
+		logger.Error("Failed to write file:",
+			zap.Error(err),
+		)
 	}
 
 	return nil
@@ -412,52 +439,56 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	switch args[0] {
+	commandLog := func(action string, m *discordgo.MessageCreate) {
+		logger.Info(fmt.Sprintf(action + " command called by " + m.Author.Username + "#" + m.Author.Discriminator + " in channel " + m.ChannelID + " on server " + m.GuildID + "."))
+	}
+
+	commandLogArgs := func(action string, args []string, m *discordgo.MessageCreate) {
+		logger.Info(fmt.Sprintf(action+" command called by "+m.Author.Username+"#"+m.Author.Discriminator+" in channel "+m.ChannelID+" on server "+m.GuildID+"."),
+			zap.String("args", fmt.Sprintf("%s", args[1:])),
+		)
+	}
+
+	argName := args[0]
+	switch argName {
+	case "join":
+		commandLog(argName, m)
+		commandJoin(s, g, c, m)
 	case "help":
-		logger.Info(fmt.Sprintf("help command called by " + m.Author.Username + "#" + m.Author.Discriminator + " in channel " + m.ChannelID + " on server " + m.GuildID + "."))
+		commandLog(argName, m)
 		commandHelp(c)
 	case "play":
-		logger.Info(fmt.Sprintf("play command called by "+m.Author.Username+"#"+m.Author.Discriminator+" in channel "+m.ChannelID+" on server "+m.GuildID+"."),
-			zap.String("args", fmt.Sprintf("%s", args[1:])),
-		)
+		commandLogArgs(argName, args, m)
 		commandPlay(s, g, c, args[1:])
 	case "seek":
-		logger.Info(fmt.Sprintf("seek command called by "+m.Author.Username+"#"+m.Author.Discriminator+" in channel "+m.ChannelID+" on server "+m.GuildID+"."),
-			zap.String("args", fmt.Sprintf("%s", args[1:])),
-		)
+		commandLogArgs(argName, args, m)
 		commandSeek(c, args[1:])
 	case "pos":
-		logger.Info(fmt.Sprintf("pos command called by "+m.Author.Username+"#"+m.Author.Discriminator+" in channel "+m.ChannelID+" on server "+m.GuildID+"."),
-			zap.String("args", fmt.Sprintf("%s", args[1:])),
-		)
+		commandLogArgs(argName, args, m)
 		commandPos(c)
 	case "loop":
-		logger.Info(fmt.Sprintf("loop command called by " + m.Author.Username + "#" + m.Author.Discriminator + " in channel " + m.ChannelID + " on server " + m.GuildID + "."))
+		commandLog(argName, m)
 		commandLoop(c)
 	case "add":
-		logger.Info(fmt.Sprintf("add command called by "+m.Author.Username+"#"+m.Author.Discriminator+" in channel "+m.ChannelID+" on server "+m.GuildID+"."),
-			zap.String("args", fmt.Sprintf("%s", args[1:])),
-		)
+		commandLogArgs(argName, args, m)
 		commandAdd(c, args[1:], false)
 	case "queue":
-		logger.Info(fmt.Sprintf("queue command called by " + m.Author.Username + "#" + m.Author.Discriminator + " in channel " + m.ChannelID + " on server " + m.GuildID + "."))
+		commandLog(argName, m)
 		commandQueue(c)
 	case "pause":
-		logger.Info(fmt.Sprintf("pause command called by " + m.Author.Username + "#" + m.Author.Discriminator + " in channel " + m.ChannelID + " on server " + m.GuildID + "."))
+		commandLog(argName, m)
 		commandPause(c)
 	case "stop":
-		logger.Info(fmt.Sprintf("stop command called by " + m.Author.Username + "#" + m.Author.Discriminator + " in channel " + m.ChannelID + " on server " + m.GuildID + "."))
+		commandLog(argName, m)
 		commandStop(c)
 	case "skip":
-		logger.Info(fmt.Sprintf("skip command called by " + m.Author.Username + "#" + m.Author.Discriminator + " in channel " + m.ChannelID + " on server " + m.GuildID + "."))
+		commandLog(argName, m)
 		commandSkip(c)
 	case "delete":
-		logger.Info(fmt.Sprintf("delete command called by "+m.Author.Username+"#"+m.Author.Discriminator+" in channel "+m.ChannelID+" on server "+m.GuildID+"."),
-			zap.String("args", fmt.Sprintf("%s", args[1:])),
-		)
+		commandLogArgs(argName, args, m)
 		commandDelete(c, args[1:])
 	case "shuffle":
-		logger.Info(fmt.Sprintf("shuffle command called by " + m.Author.Username + "#" + m.Author.Discriminator + " in channel " + m.ChannelID + " on server " + m.GuildID + "."))
+		commandLog(argName, m)
 		commandShuffle(c)
 	}
 }
@@ -491,65 +522,53 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 	logger.Debug("Voice event for user: " + member.User.Username + "#" + member.User.Discriminator + ".")
 
 	// Check if user has a "custom name" set
-	customBool := false
+	isCustomUsername := false
 	var customName string
 	for userName, customUserName := range cfg.CustomNames {
 		if strings.EqualFold(member.User.Username, userName) {
-			customBool = true
+			isCustomUsername = true
 			customName = customUserName
 		}
 	}
 
+	userAnnounceName := member.User.Username
 	// Use custom name, or...
-	if customBool {
+	if isCustomUsername {
 		logger.Info("Real user and custom name: " + fmt.Sprintf("%s and %s", member.User.Username, customName))
-		join := fmt.Sprintf("%s joined.", customName)
-		part := fmt.Sprintf("%s left.", customName)
-		msgs := []string{join, part}
-		err = GetAudioFile(msgs, member.User.ID, customName)
-		if err != nil {
-			logger.Error("Error: Failed to get custom audio file for user (" + customName + ") " + member.User.Username + "#" + member.User.Discriminator + ".")
-		}
-		// Use standard name.
-	} else {
-		join := fmt.Sprintf("%s joined.", member.User.Username)
-		part := fmt.Sprintf("%s left.", member.User.Username)
-		msgs := []string{join, part}
-		err = GetAudioFile(msgs, member.User.ID, member.User.Username)
-		if err != nil {
-			logger.Error("Error: Failed to get audio file for user " + member.User.Username + "#" + member.User.Discriminator + ".")
-		}
+		userAnnounceName = customName
+	}
+
+	join := fmt.Sprintf("%s joined.", userAnnounceName)
+	part := fmt.Sprintf("%s left.", userAnnounceName)
+	msgs := []string{join, part}
+
+	err = GetAudioFile(msgs, member.User.ID, userAnnounceName)
+	if err != nil {
+		logMessage := fmt.Sprintf("Error: failed to get audio file for user %s#%s (has custom: %s)", member.User.Username, member.User.Discriminator, strconv.FormatBool(isCustomUsername))
+		logger.Error(logMessage)
 	}
 
 	s.RLock()
 	vc := s.VoiceConnections[event.GuildID]
 	s.RUnlock()
-	if vc == nil {
-		vc, err := s.ChannelVoiceJoin(event.GuildID, event.ChannelID, false, true)
+
+	botChannel, err := s.State.VoiceState(event.GuildID, s.State.User.ID)
+	if botChannel == nil || err != nil || vc == nil {
+		logger.Info(fmt.Sprintf("Attempting to join voice channel %s", event.ChannelID))
+
+		_, err := s.ChannelVoiceJoin(event.GuildID, event.ChannelID, false, true)
 		if err != nil {
 			logger.Sugar().Errorf("Error joining voice channel: %s.", err)
 			return
 		}
-		s.Lock()
-		s.VoiceConnections[event.GuildID] = vc
-		s.Unlock()
 	}
-
-	botChannel, err := s.State.VoiceState(event.GuildID, s.State.User.ID)
-	if err != nil {
-		logger.Sugar().Errorf("Error determining bot voice channel: %s.", err)
-		return
-	}
-
-	// vc.Lock()
-	// vc.LogLevel = discordgo.LogDebug
-	// vc.Unlock()
 
 	// Try to determine the type of event.
 	if err != nil {
 		logger.Error("Error: Failed to get voice state of user " + event.UserID + ".")
 		return
 	}
+
 	if (event.BeforeUpdate == nil || event.BeforeUpdate.ChannelID != botChannel.ChannelID) && event.ChannelID == botChannel.ChannelID {
 		logger.Info("User has joined voice channel: " + member.User.Username + "#" + member.User.Discriminator + ".")
 		time.Sleep(1250 * time.Millisecond)
@@ -557,16 +576,10 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		// Stop the bot from trying to read multiple joins at the same time (so that it doesn't destroy our ears)
 		mPlayAudio.Lock()
 
+		filename := fmt.Sprintf("%s_%s", member.User.ID, userAnnounceName)
 		// TODO: Make this a configurable option.
 		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], "trumpet.opus", make(<-chan bool))
-
-		if customBool {
-			filename := fmt.Sprintf("%s_%s", member.User.ID, customName)
-			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
-		} else {
-			filename := fmt.Sprintf("%s_%s", member.User.ID, member.User.Username)
-			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
-		}
+		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
 
 		mPlayAudio.Unlock()
 
@@ -582,8 +595,7 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 	// Ignore Server/Self Mute/Deafen events.
 	if event.BeforeUpdate == nil {
 		return
-	}
-	if event.BeforeUpdate.Deaf != event.VoiceState.Deaf {
+	} else if event.BeforeUpdate.Deaf != event.VoiceState.Deaf {
 		return
 	} else if event.BeforeUpdate.SelfDeaf != event.VoiceState.SelfDeaf {
 		return
@@ -599,13 +611,8 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 
 		mPlayAudio.Lock()
 
-		if customBool {
-			filename := fmt.Sprintf("%s_%s", member.User.ID, customName)
-			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_leave.ogg", make(<-chan bool))
-		} else {
-			filename := fmt.Sprintf("%s_%s", member.User.ID, member.User.Username)
-			dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_leave.ogg", make(<-chan bool))
-		}
+		filename := fmt.Sprintf("%s_%s", member.User.ID, userAnnounceName)
+		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_leave.ogg", make(<-chan bool))
 
 		mPlayAudio.Unlock()
 		return
