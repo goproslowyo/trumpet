@@ -35,5 +35,6 @@ func GetHeraldSound(announcement_dir string) string {
 	}
 
 	rand.Seed(time.Now().UnixNano())
-	return fmt.Sprintf("%s\n", announcement[rand.Intn(len(announcement))])
+	afile := announcement[rand.Intn(len(announcement))]
+	return fmt.Sprintf("%s/%s", announcement_dir, afile)
 }
