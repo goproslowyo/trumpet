@@ -1,13 +1,13 @@
 package util
 
 import (
-	"os/exec"
 	"fmt"
-	"math/rand"
-	"time"
 	"io/ioutil"
 	"log"
+	"math/rand"
+	"os/exec"
 	"strings"
+	"time"
 )
 
 // Not using "command -v" because it doesn't work with Windows.
@@ -27,15 +27,15 @@ func GetHeraldSound(announcement_dir string) string {
 	files, err := ioutil.ReadDir(announcement_dir)
 
 	if err != nil {
-			log.Fatal(err)
+		log.Fatal(err)
 	}
 
 	for _, file := range files {
-			if strings.HasSuffix(file.Name(), ".opus"){
-							announcement = append(announcement, file.Name())
-			}
+		if strings.HasSuffix(file.Name(), ".opus") {
+			announcement = append(announcement, file.Name())
+		}
 	}
 
 	rand.Seed(time.Now().UnixNano())
-	return fmt.Sprintf("%s\n",announcement[rand.Intn(len(announcement))])
+	return fmt.Sprintf("%s\n", announcement[rand.Intn(len(announcement))])
 }
