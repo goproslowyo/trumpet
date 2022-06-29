@@ -24,7 +24,6 @@ func CheckInstalled(program, testArg string) bool {
 func GetHeraldSound(announcement_dir string) string {
 	var announcement []string
 	files, err := ioutil.ReadDir(announcement_dir)
-
 	if err != nil {
 		log.Fatal(err)
 	}
