@@ -577,8 +577,9 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		mPlayAudio.Lock()
 
 		filename := fmt.Sprintf("%s_%s", member.User.ID, userAnnounceName)
-		// TODO: Make this a configurable option.
-		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], "trumpet.opus", make(<-chan bool))
+		// TODONE: Make this a configurable option. <3
+		announcement := GetHeraldSound(cfg.AnnouncementPath)
+		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], announcement, make(<-chan bool))
 		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
 
 		mPlayAudio.Unlock()
