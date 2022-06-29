@@ -3,6 +3,7 @@
     "ExampleUser": "Call Me Something Else"
   },
   "ffmpeg_path": "ffmpeg",
+  "announcement_path": "announcements",
   "google_service_account_credentials": "google-translate-api-credentials.json",
   "ignore_list": [],
   "prefix": "!",

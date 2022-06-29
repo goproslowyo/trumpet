@@ -1,7 +1,13 @@
 package util
 
 import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"math/rand"
 	"os/exec"
+	"strings"
+	"time"
 )
 
 // Not using "command -v" because it doesn't work with Windows.
@@ -12,4 +18,23 @@ func CheckInstalled(program, testArg string) bool {
 		return false
 	}
 	return true
+}
+
+// Loop through announcements dir to create array of greetings.
+func GetHeraldSound(announcement_dir string) string {
+	var announcement []string
+	files, err := ioutil.ReadDir(announcement_dir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".opus") {
+			announcement = append(announcement, file.Name())
+		}
+	}
+
+	rand.Seed(time.Now().UnixNano())
+	afile := announcement[rand.Intn(len(announcement))]
+	return fmt.Sprintf("%s/%s", announcement_dir, afile)
 }

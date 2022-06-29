@@ -11,6 +11,7 @@ import (
 type Config struct {
 	CustomNames                     map[string]string `json:"custom_names"`
 	FfmpegPath                      string            `json:"ffmpeg_path"`
+	AnnouncementPath                string            `json:"announcement_path"`
 	GoogleServiceAccountCredentials string            `json:"google_service_account_credentials"`
 	IgnoreList                      []string          `json:"ignore_list"`
 	Prefix                          string            `json:"prefix"`
@@ -51,6 +52,7 @@ func WriteDefaultConfig() error {
 	data, err := json.MarshalIndent(Config{
 		CustomNames:                     map[string]string{},
 		FfmpegPath:                      "ffmpeg",
+		AnnouncementPath:                "announcements",
 		GoogleServiceAccountCredentials: "google-translate-api-credentials.json",
 		IgnoreList:                      []string{},
 		Prefix:                          "!",
