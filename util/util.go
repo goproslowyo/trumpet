@@ -20,8 +20,7 @@ func CheckInstalled(program, testArg string) bool {
 	return true
 }
 
-// loop through dir to create array of sounds
-
+// Loop through announcements dir to create array of greetings.
 func GetHeraldSound(announcement_dir string) string {
 	var announcement []string
 	files, err := ioutil.ReadDir(announcement_dir)
