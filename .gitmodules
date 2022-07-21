@@ -1,0 +1,3 @@
+[submodule "src/gopus"]
+	path = src/gopus
+	url = https://github.com/layeh/gopus
