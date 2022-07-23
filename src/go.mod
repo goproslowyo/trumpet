@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	cloud.google.com/go/texttospeech v1.3.0
-	github.com/bwmarrin/dgvoice v0.0.0-20210225172318-caaac756e02e
 	github.com/bwmarrin/discordgo v0.25.0
 	go.uber.org/zap v1.21.0
 	google.golang.org/api v0.88.0

@@ -17,7 +17,6 @@ import (
 	"trumpet/util"
 
 	texttospeech "cloud.google.com/go/texttospeech/apiv1"
-	"github.com/bwmarrin/dgvoice"
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
 	"google.golang.org/api/option"
@@ -313,6 +312,7 @@ func GetAudioFile(messages []string, userid string, username string) error {
 ////////////////////////////////
 var clients map[string]*Client // Guild ID to client
 var mClients sync.Mutex
+
 var mPlayAudio sync.Mutex
 
 var cfg Config
@@ -390,6 +390,7 @@ func main() {
 }
 
 func ready(s *discordgo.Session, event *discordgo.Ready) {
+	s.LogLevel = discordgo.LogDebug
 	u := s.State.User
 	log_string := fmt.Sprintf("Logged in to Discord as " + u.Username + "#" + u.Discriminator + ". Discord UID: " + u.ID + ".")
 	logger.Info(log_string,
@@ -402,6 +403,7 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	s.LogLevel = discordgo.LogInformational
 	// Ignore messages from the bot itself.
 	if m.Author.ID == s.State.User.ID {
 		return
@@ -454,6 +456,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	case "join":
 		commandLog(argName, m)
 		commandJoin(s, g, c, m)
+	case "part":
+		commandLog(argName, m)
+		commandPart(s, g, c, m)
 	case "help":
 		commandLog(argName, m)
 		commandHelp(c)
@@ -494,6 +499,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
+	s.LogLevel = discordgo.LogDebug
 	// Ignore messages from the bot itself.
 	if event.UserID == s.State.User.ID {
 		return
@@ -573,13 +579,13 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		logger.Info("User has joined voice channel: " + member.User.Username + "#" + member.User.Discriminator + ".")
 		time.Sleep(1250 * time.Millisecond)
 
-		// Stop the bot from trying to read multiple joins at the same time (so that it doesn't destroy our ears)
+		// // Stop the bot from trying to read multiple joins at the same time (so that it doesn't destroy our ears)
 		mPlayAudio.Lock()
 
 		filename := fmt.Sprintf("%s_%s", member.User.ID, userAnnounceName)
 		announcement := util.GetHeraldSound(cfg.AnnouncementPath)
-		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], announcement, make(<-chan bool))
-		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
+		PlayAudioFile(s.VoiceConnections[event.GuildID], announcement, make(<-chan bool))
+		PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
 
 		mPlayAudio.Unlock()
 
@@ -612,7 +618,7 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		mPlayAudio.Lock()
 
 		filename := fmt.Sprintf("%s_%s", member.User.ID, userAnnounceName)
-		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_leave.ogg", make(<-chan bool))
+		PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_leave.ogg", make(<-chan bool))
 
 		mPlayAudio.Unlock()
 		return

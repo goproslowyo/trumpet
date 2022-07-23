@@ -506,3 +506,10 @@ func commandJoin(s *discordgo.Session, g *discordgo.Guild, c *Client, m *discord
 		return
 	}
 }
+
+func commandPart(s *discordgo.Session, g *discordgo.Guild, c *Client, m *discordgo.MessageCreate) {
+	logger.Info(fmt.Sprintf("Disconnecting from voice channel %s", c.VoiceChannelID))
+	c.RLock()
+	s.VoiceConnections[g.ID].Disconnect()
+	c.RUnlock()
+}
