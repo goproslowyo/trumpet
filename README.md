@@ -37,6 +37,8 @@ Example configuration:
 
 - Copy `config.json.example config.json` or run the binary once to generate `config.json`: `./trumpet`.
 
+- You can get the TTS api credentials by following instructions [here](https://cloud.google.com/text-to-speech/docs/libraries#setting_up_authentication).
+
 - In `config.json`, find the line that says `"token"`. In that line, change the text that says `"insert your discord bot token here"` to whatever your bot token is (just look it up if you don't know how to get one). Remember to keep the `""` surrounding the token.
 
 - Run the program: `./trumpet`.
