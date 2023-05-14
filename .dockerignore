@@ -1,0 +1,8 @@
+*.rsa
+announcements/
+announcements-*/
+audio/
+youtube-dl/
+mirror/
+ffmpeg/packages/
+Xmas_Audio.7z

@@ -21,13 +21,12 @@ type Config struct {
 	ConfigHash                      string
 }
 
-const configFile = "config.json"
+const configFile = "/trumpet/config.json"
 
 const tokenDefaultString = "insert your discord bot token here"
 
 func (c *Config) hashConfig(config []byte) string {
-	hash := fmt.Sprintf("%x", sha256.Sum256(config))
-	return hash
+	return fmt.Sprintf("%x", sha256.Sum256(config))
 }
 
 func ReadConfig(cfg *Config) error {
@@ -58,7 +57,7 @@ func WriteDefaultConfig() error {
 		Prefix:                          "!",
 		Token:                           tokenDefaultString,
 		UserAudioPath:                   "audio/",
-		YtdlPath:                        "youtube-dl",
+		YtdlPath:                        "/home/nonroot/.local/bin/yt-dlp",
 	}, "", "\t")
 	if err != nil {
 		return err

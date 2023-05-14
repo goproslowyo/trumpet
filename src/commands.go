@@ -6,17 +6,17 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
 	"trumpet/dca0"
 	"trumpet/ytdl"
 
 	"github.com/bwmarrin/discordgo"
+	"go.uber.org/zap"
 )
 
-////////////////////////////////
+// //////////////////////////////
 // Helper functions.
-////////////////////////////////
+// //////////////////////////////
 func generateHelpMsg() string {
 	// Align all commands nicely so that the descriptions are in the same
 	// column.
@@ -68,14 +68,14 @@ func dcSanitize(in string) string {
 	return strings.ReplaceAll(in, "||", "\\|\\|")
 }
 
-////////////////////////////////
+// //////////////////////////////
 // Global variables.
-////////////////////////////////
+// //////////////////////////////
 var helpMsg string
 
-////////////////////////////////
+// //////////////////////////////
 // The actual commands.
-////////////////////////////////
+// //////////////////////////////
 func commandHelp(c *Client) {
 	// We're not generating the help message in the var declaration because
 	// generateHelpMsg() relies on the config which hasn't been read at that
@@ -87,12 +87,14 @@ func commandHelp(c *Client) {
 }
 
 func commandPlay(s *discordgo.Session, g *discordgo.Guild, c *Client, args []string) {
+	c.DebugLog("Play command called with args: %+s\n", args)
 	var playbackActive bool
 	{
 		var playback Playback
 		if playback, playbackActive = c.GetPlaybackInfo(); playbackActive {
 			if playback.Paused {
 				c.Messagef("Resuming playback.")
+				c.DebugLog("Resuming playback for: %s\n", playback.Title)
 				playback.CmdCh <- dca0.CommandResume{}
 				c.Lock()
 				c.Playback.Paused = false
@@ -109,6 +111,7 @@ func commandPlay(s *discordgo.Session, g *discordgo.Guild, c *Client, args []str
 
 	if len(args) > 0 {
 		// Add the current track/playlist in place.
+		c.DebugLog("Adding to queue: %s\n", args)
 		commandAdd(c, args, false)
 		// We only want one player active at once.
 		if playbackActive {
@@ -157,6 +160,11 @@ func commandPlay(s *discordgo.Session, g *discordgo.Guild, c *Client, args []str
 			Track:  track,
 		}
 		c.Unlock()
+
+		c.DebugLog("Got playback title: %+s\n", c.Playback.Track.Title)
+		c.DebugLog("Got playback url: %+s\n", c.Playback.Track.Url)
+		c.DebugLog("Got playback mediaUrl: %+s\n", c.Playback.Track.MediaUrl)
+
 		// We just set the playback info so we don't have to check if it's there.
 		playback, _ := c.GetPlaybackInfo()
 		errCh := make(chan error)
@@ -179,8 +187,10 @@ func commandPlay(s *discordgo.Session, g *discordgo.Guild, c *Client, args []str
 		}
 		// Done with this song.
 		playback, _ = c.GetPlaybackInfo()
+
 	}
 	c.Messagef("Done playing queue.")
+	vc.Speaking(false)
 }
 
 // If inPlace is set to true, the track will be added to the front and replace
@@ -194,13 +204,17 @@ func commandAdd(c *Client, args []string, inPlace bool) {
 
 	// URL or search query.
 	input := strings.Join(args, " ")
+	logger.Debug("Got input:",
+		zap.String("input", input),
+	)
 
 	// TODO: This is some very shitty detection for if we're dealing with a
 	// playlist.
-	if strings.HasPrefix(path.Base(input), "playlist") {
+	if strings.HasPrefix(path.Base(input), "list") {
 		c.Messagef("Long playlists may take a while to add, please be patient.")
 	}
 
+	logger.Debug("Creating new metadata extractor")
 	ytdlEx := ytdl.NewExtractor(cfg.YtdlPath)
 
 	meta, err := ytdlEx.GetMetadata(input)
@@ -476,7 +490,8 @@ func commandDelete(c *Client, args []string) {
 }
 
 func commandShuffle(c *Client) {
-	rand.Seed(time.Now().Unix())
+	seed := rand.Int63()
+	rand.New(rand.NewSource(seed))
 	queueLen := c.QueueLen()
 	c.Lock()
 	rand.Shuffle(queueLen, func(a, b int) {
@@ -498,11 +513,11 @@ func commandJoin(s *discordgo.Session, g *discordgo.Guild, c *Client, m *discord
 	c.RUnlock()
 
 	guildId := g.ID
-	logger.Info(fmt.Sprintf("Attempting to join voice channel %s", channelId))
+	logger.Sugar().Infof("Attempting to join voice channel %s", channelId)
 
 	_, err := s.ChannelVoiceJoin(guildId, channelId, false, true)
 	if err != nil {
-		logger.Sugar().Errorf("Error joining voice channel: %s.", err)
+		logger.Sugar().Infof("Error joining voice channel: %s.", err)
 		return
 	}
 }

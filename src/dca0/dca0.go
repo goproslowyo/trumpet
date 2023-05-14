@@ -2,6 +2,7 @@ package dca0
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -249,6 +250,9 @@ loop:
 			}
 		}
 	}
+
+	fmt.Println("Theoretically done calling ffmpeg.")
+	fmt.Printf("%s %s\n", cmd.Path, cmd.Args)
 
 	// Wait for the encoder to finish if it's still running.
 	if encoderRunning {

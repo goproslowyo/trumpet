@@ -1,3 +1,6 @@
 [submodule "src/gopus"]
 	path = src/gopus
 	url = https://github.com/layeh/gopus
+[submodule "static-ffmpeg"]
+	path = static-ffmpeg
+	url = https://github.com/wader/static-ffmpeg.git

@@ -3,6 +3,7 @@ package dca0
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os/exec"
 	"strconv"
@@ -61,6 +62,7 @@ func getPcm(input string, opts PcmOptions) (io.ReadCloser, *exec.Cmd, error) {
 		"pipe:1", // Output to stdout.
 	}...)
 	cmd := exec.Command(opts.FfmpegPath, cmdOpts...)
+	fmt.Printf("ffmpeg command: %s %s\n", cmd.Path, cmd.Args)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, nil, err
@@ -68,5 +70,6 @@ func getPcm(input string, opts PcmOptions) (io.ReadCloser, *exec.Cmd, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, nil, err
 	}
+	fmt.Println("Seemingly called ffmpeg successfully?")
 	return stdout, cmd, nil
 }
