@@ -1,0 +1,16 @@
+version: "3"
+services:
+
+  trumpet:
+    image: ghcr.io/goproslowyo/trumpet:latest
+    volumes:
+      - config-data:/trumpet:rw
+    restart: always
+    user: 65532:65532
+    environment:
+      LOGLEVEL: debug
+      LOG_LEVEL: debug
+
+volumes:
+  config-data:
+    driver: local

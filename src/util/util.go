@@ -2,30 +2,35 @@ package util
 
 import (
 	"fmt"
-	"io/ioutil"
-	"log"
 	"math/rand"
+	"os"
 	"os/exec"
 	"strings"
-	"time"
+
+	"go.uber.org/zap"
 )
+
+var logger *zap.Logger
 
 // Not using "command -v" because it doesn't work with Windows.
 // testArg will usually be something like --version.
-func CheckInstalled(program, testArg string) bool {
+func CheckInstalled(program, testArg string) (bool, error) {
+	logger, _ = zap.NewDevelopment()
+	defer logger.Sync()
 	cmd := exec.Command(program, testArg)
 	if err := cmd.Run(); err != nil {
-		return false
+		return false, err
 	}
-	return true
+
+	return true, nil
 }
 
 // Loop through announcements dir to create array of greetings.
 func GetHeraldSound(announcement_dir string) string {
 	var announcement []string
-	files, err := ioutil.ReadDir(announcement_dir)
+	files, err := os.ReadDir(announcement_dir)
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err.Error())
 	}
 
 	for _, file := range files {
@@ -34,7 +39,8 @@ func GetHeraldSound(announcement_dir string) string {
 		}
 	}
 
-	rand.Seed(time.Now().UnixNano())
+	seed := rand.Int63()
+	rand.New(rand.NewSource(seed))
 	afile := announcement[rand.Intn(len(announcement))]
 	return fmt.Sprintf("%s/%s", announcement_dir, afile)
 }

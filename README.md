@@ -37,9 +37,26 @@ Example configuration:
 
 - Copy `config.json.example config.json` or run the binary once to generate `config.json`: `./trumpet`.
 
+- You can get the TTS api credentials by following instructions [here](https://cloud.google.com/text-to-speech/docs/libraries#setting_up_authentication).
+
 - In `config.json`, find the line that says `"token"`. In that line, change the text that says `"insert your discord bot token here"` to whatever your bot token is (just look it up if you don't know how to get one). Remember to keep the `""` surrounding the token.
 
 - Run the program: `./trumpet`.
+
+## Docker
+
+The code should build and run in docker. The Makefile is opinionated about the volume mounts for configs/audio/etc so check accordingly.
+
+```bash
+$ make docker-build
+[...snip...]
+$ make docker-run
+{"level":"info","ts":1658381475.0567544,"caller":"trumpet/config.go:46","msg":"Config file (re)loaded, hash: 99637ef5541bb735d92adad83c646569466c35df71d20190e88b23ab30bf295e\n"}
+{"level":"info","ts":1658381475.802256,"caller":"trumpet/main.go:377","msg":"Opened Discord websocket session."}
+Bot is now running. Press Ctrl+c to exit.
+{"level":"info","ts":1658381475.802329,"caller":"trumpet/main.go:395","msg":"Logged in to Discord as trumpet#7925. Discord UID: 924974173963579392.","username":"trumpet","discriminator":"7925","id":"924974173963579392"}
+Logged in as trumpet#7925.
+```
 
 ### Configuration Options
 

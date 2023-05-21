@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os/exec"
 )
 
@@ -89,10 +90,13 @@ func (e *Extractor) GetMetadata(input string, progress chan<- struct{}) ([]Metad
 // Returns a slice with size 1 if the input is a single media file. Returns a
 // larger slice if the input is a playlist.
 func (e *Extractor) GetMetadata(input string) ([]Metadata, error) {
+	fmt.Printf("Getting metadata: %s\n", input)
 	cmd := exec.Command(e.YtdlPath, "--default-search", e.DefaultSearch, "-j", input)
+	fmt.Printf("%s %s", cmd.Path, cmd.Args)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
+		fmt.Printf("Failed getting metadata: %s", err)
 		return nil, newError(input, err)
 	}
 

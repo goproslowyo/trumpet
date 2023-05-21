@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -20,13 +19,15 @@ import (
 	"github.com/bwmarrin/dgvoice"
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/api/option"
-	texttospeechpb "google.golang.org/genproto/googleapis/cloud/texttospeech/v1"
+
+	texttospeechpb "cloud.google.com/go/texttospeech/apiv1/texttospeechpb"
 )
 
-////////////////////////////////
+// //////////////////////////////
 // Helper functions.
-////////////////////////////////
+// //////////////////////////////
 // The first return value contains the voice channel ID, if it was found. If it
 // was not found, it is set to "".
 // The second return value indicates whether the voice channel was found.
@@ -39,9 +40,9 @@ func GetUserVoiceChannel(g *discordgo.Guild, userID string) (string, bool) {
 	return "", false
 }
 
-////////////////////////////////
+// //////////////////////////////
 // Structs.
-////////////////////////////////
+// //////////////////////////////
 type Playback struct {
 	Track
 	CmdCh  chan dca0.Command
@@ -73,23 +74,26 @@ type Client struct {
 	Playback *Playback
 	// Queue.
 	Queue []*Track
+
+	LogClient *zap.Logger
 }
 
 func NewClient(s *discordgo.Session) *Client {
 	return &Client{
-		s: s,
+		s:         s,
+		LogClient: logger,
 	}
 }
 
 func SynthesizeSpeech(googleServiceAccount string, text string) []byte {
-	b, err := ioutil.ReadFile(googleServiceAccount)
+	b, err := os.ReadFile(googleServiceAccount)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("unable to open google service account file: %s\n", err.Error()))
 	}
 	ctx := context.Background()
 	c, err := texttospeech.NewClient(ctx, option.WithCredentialsJSON(b))
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("Failed to create client: %s", err.Error()))
+		logger.Sugar().Fatalf("Failed to create client: %s", err.Error())
 	}
 	defer c.Close()
 
@@ -116,6 +120,10 @@ func SynthesizeSpeech(googleServiceAccount string, text string) []byte {
 	}
 
 	return resp.AudioContent
+}
+
+func (c *Client) DebugLog(format string, a interface{}) {
+	c.LogClient.Sugar().Debugf(format, a)
 }
 
 func (c *Client) Messagef(format string, a ...interface{}) {
@@ -278,7 +286,7 @@ func GetAudioFile(messages []string, userid string, username string) error {
 
 	logger.Warn("Join file doesn't exist, creating...")
 	joinGreet := SynthesizeSpeech(cfg.GoogleServiceAccountCredentials, messages[0])
-	err = ioutil.WriteFile(joinPath, joinGreet, 0640)
+	err = os.WriteFile(joinPath, joinGreet, 0640)
 	if err != nil {
 		logger.Error("Failed to write greeting file",
 			zap.Error(err),
@@ -298,7 +306,7 @@ func GetAudioFile(messages []string, userid string, username string) error {
 	}
 	logger.Warn("Leave file doesn't exist, creating...")
 	partGreet := SynthesizeSpeech(cfg.GoogleServiceAccountCredentials, messages[1])
-	err = ioutil.WriteFile(partPath, partGreet, 0640)
+	err = os.WriteFile(partPath, partGreet, 0640)
 	if err != nil {
 		logger.Error("Failed to write file:",
 			zap.Error(err),
@@ -308,9 +316,9 @@ func GetAudioFile(messages []string, userid string, username string) error {
 	return nil
 }
 
-////////////////////////////////
+// //////////////////////////////
 // Global variables.
-////////////////////////////////
+// //////////////////////////////
 var clients map[string]*Client // Guild ID to client
 var mClients sync.Mutex
 var mPlayAudio sync.Mutex
@@ -318,12 +326,25 @@ var mPlayAudio sync.Mutex
 var cfg Config
 var logger *zap.Logger
 
-////////////////////////////////
+// //////////////////////////////
 // Main program.
-////////////////////////////////
+// //////////////////////////////
 func main() {
-	logger, _ = zap.NewProduction()
+	var config zap.Config
+	var err error
+
+	config = zap.NewDevelopmentConfig()
+	// config.EncoderConfig.EncodeLevel = zapcore.
+	config.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	config.EncoderConfig.TimeKey = "time: "
+	config.Level.SetLevel(zapcore.DebugLevel)
+
+	logger, err = config.Build()
+	if err != nil {
+		panic(err)
+	}
 	defer logger.Sync()
+
 	if err := ReadConfig(&cfg); err != nil {
 		fmt.Println(err)
 		if err := WriteDefaultConfig(); err != nil {
@@ -341,13 +362,15 @@ func main() {
 	}
 
 	// Check if all binary dependencies are installed correctly.
-	const notInstalledErrMsg = "Unable to find %s in the specified path '%s', please make sure it's installed correctly.\nYou can manually set its path by editing %s\n"
-	if !util.CheckInstalled(cfg.YtdlPath, "--version") {
-		fmt.Printf(notInstalledErrMsg, "youtube-dl", cfg.YtdlPath, configFile)
+	const notInstalledErrMsg = "Unable to find %s in the specified path '%s', please make sure it's installed correctly. You can manually set its path by editing %s. Error message: %s.\n"
+	found, err := util.CheckInstalled(cfg.YtdlPath, "--version")
+	if err != nil && !found {
+		fmt.Printf(notInstalledErrMsg, "yt-dlp", cfg.YtdlPath, configFile, err)
 		return
 	}
-	if !util.CheckInstalled(cfg.FfmpegPath, "-version") {
-		fmt.Printf(notInstalledErrMsg, "ffmpeg", cfg.FfmpegPath, configFile)
+	found, err = util.CheckInstalled(cfg.FfmpegPath, "-version")
+	if err != nil && !found {
+		fmt.Printf(notInstalledErrMsg, "ffmpeg", cfg.FfmpegPath, configFile, err)
 		return
 	}
 
@@ -374,6 +397,9 @@ func main() {
 		fmt.Println("Error opening Discord session:", err)
 		return
 	}
+	// Cleanly close down the Discord session.
+	defer dg.Close()
+
 	logger.Info("Opened Discord websocket session.")
 
 	// Wait here until Ctrl+c or other term signal is received.
@@ -385,8 +411,6 @@ func main() {
 	logger.Info("Signal received, closing Discord session.")
 	fmt.Println("Signal received, closing Discord session.")
 
-	// Cleanly close down the Discord session.
-	dg.Close()
 }
 
 func ready(s *discordgo.Session, event *discordgo.Ready) {
@@ -394,10 +418,8 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 	log_string := fmt.Sprintf("Logged in to Discord as " + u.Username + "#" + u.Discriminator + ". Discord UID: " + u.ID + ".")
 	logger.Info(log_string,
 		zap.String("username", u.Username),
-		zap.String("discriminator", u.Discriminator),
-		zap.String("id", u.ID),
+		zap.String("uid", u.ID),
 	)
-	fmt.Println("Logged in as", u.Username+"#"+u.Discriminator+".")
 	s.UpdateListeningStatus(cfg.Prefix + "help")
 }
 
@@ -440,13 +462,13 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	commandLog := func(action string, m *discordgo.MessageCreate) {
-		logger.Info(fmt.Sprintf(action + " command called by " + m.Author.Username + "#" + m.Author.Discriminator + " in channel " + m.ChannelID + " on server " + m.GuildID + "."))
+		logger.Sugar().Infof("%s command called by %s#%s in channel %s on server %.\nargs: %s",
+			action, m.Author.Username, m.Author.Discriminator, m.ChannelID, m.GuildID)
 	}
 
 	commandLogArgs := func(action string, args []string, m *discordgo.MessageCreate) {
-		logger.Info(fmt.Sprintf(action+" command called by "+m.Author.Username+"#"+m.Author.Discriminator+" in channel "+m.ChannelID+" on server "+m.GuildID+"."),
-			zap.String("args", fmt.Sprintf("%s", args[1:])),
-		)
+		logger.Sugar().Infof("%s command called by %s#%s in channel %s on server %s.\nrgs: %s",
+			action, m.Author.Username, m.Author.Discriminator, m.ChannelID, m.GuildID, fmt.Sprintf("%s", args[1:]))
 	}
 
 	argName := args[0]
@@ -509,17 +531,18 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 	// Check if the configHash has changed and if so, update the config.
 	err = ReadConfig(&cfg)
 	if err != nil {
-		logger.Error("Error: Failed to re-read config file: " + fmt.Sprintf("%s", err))
+		logger.Sugar().Errorf("Error: Failed to re-read config file: %s", err)
 	}
 
 	// Check if it's a user on the ignore list.
 	for _, ignore := range cfg.IgnoreList {
 		if member.User.Username == ignore {
+			logger.Sugar().Debugf("Ignoring %s", member.User.Username)
 			return
 		}
 	}
 
-	logger.Debug("Voice event for user: " + member.User.Username + "#" + member.User.Discriminator + ".")
+	logger.Debug("Voice chat event for user: " + member.User.Username + "#" + member.User.Discriminator + ".")
 
 	// Check if user has a "custom name" set
 	isCustomUsername := false
@@ -534,7 +557,7 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 	userAnnounceName := member.User.Username
 	// Use custom name, or...
 	if isCustomUsername {
-		logger.Info("Real user and custom name: " + fmt.Sprintf("%s and %s", member.User.Username, customName))
+		logger.Sugar().Infof("Real username [%s], Custom name: [%s]", member.User.Username, customName)
 		userAnnounceName = customName
 	}
 
@@ -554,18 +577,16 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 
 	botChannel, err := s.State.VoiceState(event.GuildID, s.State.User.ID)
 	if botChannel == nil || err != nil || vc == nil {
-		logger.Info(fmt.Sprintf("Attempting to join voice channel %s", event.ChannelID))
-
 		_, err := s.ChannelVoiceJoin(event.GuildID, event.ChannelID, false, true)
 		if err != nil {
-			logger.Sugar().Errorf("Error joining voice channel: %s.", err)
+			logger.Sugar().Errorf("Error joining voice channel %s: %s", event.ChannelID, err)
 			return
 		}
 	}
 
 	// Try to determine the type of event.
 	if err != nil {
-		logger.Error("Error: Failed to get voice state of user " + event.UserID + ".")
+		logger.Sugar().Errorf("Error: Failed to get voice state of user %s (%s).", event.UserID, member.User.Username)
 		return
 	}
 
@@ -576,10 +597,12 @@ func announce(s *discordgo.Session, event *discordgo.VoiceStateUpdate) {
 		// Stop the bot from trying to read multiple joins at the same time (so that it doesn't destroy our ears)
 		mPlayAudio.Lock()
 
+		botChannel.SelfMute = true
 		filename := fmt.Sprintf("%s_%s", member.User.ID, userAnnounceName)
 		announcement := util.GetHeraldSound(cfg.AnnouncementPath)
 		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], announcement, make(<-chan bool))
 		dgvoice.PlayAudioFile(s.VoiceConnections[event.GuildID], filepath.Join(cfg.UserAudioPath, filename)+"_join.ogg", make(<-chan bool))
+		botChannel.SelfMute = false
 
 		mPlayAudio.Unlock()
 
