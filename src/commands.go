@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"trumpet/dca0"
-	"trumpet/ytdl"
+	"github.com/goproslowyo/trumpet/dca0"
+	"github.com/goproslowyo/trumpet/ytdl"
 
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
@@ -520,4 +520,11 @@ func commandJoin(s *discordgo.Session, g *discordgo.Guild, c *Client, m *discord
 		logger.Sugar().Infof("Error joining voice channel: %s.", err)
 		return
 	}
+}
+
+func commandPart(s *discordgo.Session, g *discordgo.Guild, c *Client, m *discordgo.MessageCreate) {
+	logger.Info(fmt.Sprintf("Disconnecting from voice channel %s", c.VoiceChannelID))
+	c.RLock()
+	s.VoiceConnections[g.ID].Disconnect()
+	c.RUnlock()
 }
