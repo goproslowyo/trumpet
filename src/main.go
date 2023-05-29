@@ -12,8 +12,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"trumpet/dca0"
-	"trumpet/util"
+
+	"github.com/goproslowyo/trumpet/dca0"
+	"github.com/goproslowyo/trumpet/util"
 
 	texttospeech "cloud.google.com/go/texttospeech/apiv1"
 	"github.com/bwmarrin/discordgo"

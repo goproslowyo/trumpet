@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"trumpet/dca0"
-	"trumpet/ytdl"
+	"github.com/goproslowyo/trumpet/dca0"
+	"github.com/goproslowyo/trumpet/ytdl"
 
 	"github.com/bwmarrin/discordgo"
 	"go.uber.org/zap"
