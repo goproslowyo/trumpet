@@ -1,6 +1,6 @@
 module github.com/goproslowyo/trumpet
 
-go 1.20
+go 1.21
 
 require (
 	cloud.google.com/go/texttospeech v1.6.2
