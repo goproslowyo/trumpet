@@ -44,7 +44,7 @@ func SendPCM(v *discordgo.VoiceConnection, pcm <-chan []int16) {
 		// read pcm from chan, exit if channel is closed.
 		recv, ok := <-pcm
 		if !ok {
-			logger.Sugar().Errorf("PCM Channel closed", nil)
+			logger.Sugar().Warn("PCM Channel closed", nil)
 			return
 		}
 
