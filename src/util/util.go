@@ -42,5 +42,6 @@ func GetHeraldSound(announcement_dir string) string {
 	seed := rand.Int63()
 	rand.New(rand.NewSource(seed))
 	afile := announcement[rand.Intn(len(announcement))]
+	fmt.Println("Chose announcement file: %s", afile)
 	return fmt.Sprintf("%s/%s", announcement_dir, afile)
 }
