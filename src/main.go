@@ -17,7 +17,7 @@ import (
 	"github.com/goproslowyo/trumpet/util"
 
 	texttospeech "cloud.google.com/go/texttospeech/apiv1"
-	"github.com/bwmarrin/discordgo"
+	"github.com/goproslowyo/discordgo"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/api/option"
