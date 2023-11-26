@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strconv"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/goproslowyo/discordgo"
 	"layeh.com/gopus"
 )
 

@@ -10,7 +10,7 @@ import (
 	"github.com/goproslowyo/trumpet/dca0"
 	"github.com/goproslowyo/trumpet/ytdl"
 
-	"github.com/bwmarrin/discordgo"
+	"github.com/goproslowyo/discordgo"
 	"go.uber.org/zap"
 )
 
