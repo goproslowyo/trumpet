@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	cloud.google.com/go/texttospeech v1.7.3
-	github.com/goproslowyo/discordgo v0.28.1
+	github.com/goproslowyo/discordgo v0.28.2-0.20240318011839-ef55a1968998
 	go.uber.org/zap v1.26.0
 	google.golang.org/api v0.148.0
 	layeh.com/gopus v0.0.0-20210501142526-1ee02d434e32
